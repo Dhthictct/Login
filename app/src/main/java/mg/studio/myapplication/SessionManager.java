@@ -31,7 +31,6 @@ public class SessionManager {
 
     // Shared preferences file name
     private static final String PREF_NAME = "pref_name";
-
     private static final String KEY_IS_LOGGED_IN = "isLoggedIn";
 
     public SessionManager(Context context) {

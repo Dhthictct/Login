@@ -3,9 +3,13 @@ package mg.studio.myapplication;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
@@ -27,6 +31,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 
+
 /**
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -44,6 +49,10 @@ public class Login extends AppCompatActivity {
     private SessionManager session;
     private Feedback feedback;
     private Button loginButton;
+
+    private Context context;
+    private String userName;
+    private String pwd;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -105,6 +114,9 @@ public class Login extends AppCompatActivity {
         String email = inputEmail.getText().toString().trim();
         String password = inputPassword.getText().toString().trim();
 
+        context = Login.this;
+
+
         // Check for empty data in the form
         if (!email.isEmpty() && !password.isEmpty()) {
 
@@ -112,16 +124,22 @@ public class Login extends AppCompatActivity {
             loginButton.setClickable(false);
 
             //Todo : ensure the user has Internet connection
+            //Todo asynchronous operation of networking login
+            if (IsHaveInternet(context)) {
+                // Display the progress Dialog
+                progressDialog.setMessage("Logging in ...");
+                if (!progressDialog.isShowing())
+                    progressDialog.show();
 
-            // Display the progress Dialog
-            progressDialog.setMessage("Logging in ...");
-            if (!progressDialog.isShowing())
-                progressDialog.show();
-
-            //Todo: need to check weather the user has Internet before attempting checking the data
-            // Start fetching the data from the Internet
-            new OnlineCredentialValidation().execute(email,password);
-
+                //Todo: need to check weather the user has Internet before attempting checking the data
+                // Start fetching the data from the Internet
+                new OnlineCredentialValidation().execute(email,password);
+                //Log in successfully, save username, password ciphertext to Shared Preferences
+                //This step of saving information should be done in Handler
+                saveInfo();
+            } else {
+                localLogin();
+            }
 
         } else {
             // Prompt user to enter credentials
@@ -301,4 +319,54 @@ public class Login extends AppCompatActivity {
         }
 
     }
+
+    private void localLogin() {
+        userName = inputEmail.getText().toString().trim();
+        pwd = inputPassword.getText().toString().trim();
+        SharedPreferences spf = context.getSharedPreferences("loginInfo",
+                MODE_PRIVATE);
+        String spsName = spf.getString("username", "");
+        String spsPwd = spf.getString("password", "");
+        if (TextUtils.isEmpty(spsPwd) && TextUtils.isEmpty(spsName)
+                && TextUtils.isEmpty(spsPwd)) {
+            Toast.makeText(context, "First landing, must access the network ", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (spsName.equals(userName) && spsPwd.equals(pwd)) {
+            session.setLogin(true);
+            feedback = new Feedback();
+            feedback.setName(userName);
+            Intent intent = new Intent(getApplication(), MainActivity.class);
+            intent.putExtra("feedback", feedback);
+            startActivity(intent);
+            finish();
+        } else {
+            Toast.makeText(context, "User name password error ", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public boolean IsHaveInternet(Context context) {
+        try {
+            ConnectivityManager manger = (ConnectivityManager) context
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+
+            NetworkInfo info = manger.getActiveNetworkInfo();
+            return (info != null && info.isConnected());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void saveInfo() {
+        SharedPreferences sp = context.getSharedPreferences("loginInfo", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sp.edit();
+        //save data
+        userName = inputEmail.getText().toString().trim();
+        pwd = inputPassword.getText().toString().trim();
+        editor.putString("username", userName);
+        editor.putString("password", pwd);
+        //commit
+        editor.commit();
+    }
+
 }
